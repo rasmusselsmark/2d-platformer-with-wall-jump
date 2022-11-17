@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Fruit
   - Trap
+  - Fan
   layers:
   - Default
   - TransparentFX

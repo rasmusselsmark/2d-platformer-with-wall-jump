@@ -10,6 +10,8 @@ public class Player : MonoBehaviour
     SpriteRenderer sr;
     Rigidbody2D rb;
     BoxCollider2D bc;
+    Animator animator;
+
     bool isDead;
 
     enum LastWallJumpSide
@@ -28,6 +30,7 @@ public class Player : MonoBehaviour
         sr = GetComponent<SpriteRenderer>();
         rb = GetComponent<Rigidbody2D>();
         bc = GetComponent<BoxCollider2D>();
+        animator = GetComponent<Animator>();
     }
 
     void Update()
@@ -37,16 +40,28 @@ public class Player : MonoBehaviour
 
         float direction = Input.GetAxisRaw("Horizontal");
 
-        // keep 5 cm distance to make sure we cannot "stick" to walls
-        if (direction < 0 && !GroundCheck(Vector2.left, 0.05f))
+        if (direction == 0)
         {
-            transform.Translate(direction * Speed * Time.deltaTime, 0, 0);
-            sr.flipX = true;
+            animator.SetBool("Run", false);
         }
-        else if (direction > 0 && !GroundCheck(Vector2.right, 0.05f))
+        else
         {
-            transform.Translate(direction * Speed * Time.deltaTime, 0, 0);
-            sr.flipX = false;
+            animator.SetBool("Run", true);
+            // keep 5 cm distance to make sure we cannot "stick" to walls
+            if (direction < 0 && !GroundCheck(Vector2.left, 0.05f))
+            {
+                transform.Translate(direction * Speed * Time.deltaTime, 0, 0);
+                rb.velocity = new Vector2(0, rb.velocity.y);
+                sr.flipX = true;
+                animator.SetBool("Run", true);
+            }
+            else if (direction > 0 && !GroundCheck(Vector2.right, 0.05f))
+            {
+                transform.Translate(direction * Speed * Time.deltaTime, 0, 0);
+                rb.velocity = new Vector2(0, rb.velocity.y);
+                sr.flipX = false;
+                animator.SetBool("Run", true);
+            }
         }
 
         bool jump = Input.GetButtonDown("Jump");
@@ -55,6 +70,7 @@ public class Player : MonoBehaviour
         if (jump && GroundCheck(Vector2.down))
         {
             rb.AddForce(Vector3.up * jumpPower, ForceMode2D.Impulse);
+            animator.SetBool("Jump", true);
             lastWallJumpSide = LastWallJumpSide.None;
         }
 
@@ -62,6 +78,7 @@ public class Player : MonoBehaviour
         else if (jump && GroundCheck(Vector2.left) && lastWallJumpSide != LastWallJumpSide.Left)
         {
             rb.AddForce(Vector3.up * jumpPower, ForceMode2D.Impulse);
+            animator.SetBool("Jump", true);
             lastWallJumpSide = LastWallJumpSide.Left;
         }
 
@@ -69,7 +86,18 @@ public class Player : MonoBehaviour
         else if (jump && GroundCheck(Vector2.right) && lastWallJumpSide != LastWallJumpSide.Right)
         {
             rb.AddForce(Vector3.up * jumpPower, ForceMode2D.Impulse);
+            animator.SetBool("Jump", true);
             lastWallJumpSide = LastWallJumpSide.Right;
+        }
+    }
+
+    void OnCollisionEnter2D(Collision2D other)
+    {
+
+        if (other.gameObject.name == "Terrain")
+        {
+            print("not jumping");
+            animator.SetBool("Jump", false);
         }
     }
 
@@ -94,5 +122,28 @@ public class Player : MonoBehaviour
             bc.bounds.center, bc.bounds.size,
             0f, 0f,
             vector, distance, groundLayer);
+    }
+
+    private void OnTriggerStay2D(Collider2D collision)
+    {
+        if (collision.gameObject.CompareTag("Fan"))
+        {
+            float distX = collision.gameObject.transform.position.x - gameObject.transform.position.x;
+            if (Mathf.Abs(distX) < 0.5f)
+                distX = Mathf.Sign(distX) * 0.5f;
+
+            float distY = Mathf.Abs(collision.gameObject.transform.position.y
+                - gameObject.transform.position.y);
+            float forceY = jumpPower / (7 * distY * distY);
+            float forceX = -jumpPower / (4 * distX);
+
+            if ((distY < 3) && (rb.velocity.y < 0))
+                forceY *= 3;
+
+            if (Mathf.Abs(forceY) > 450)
+                forceY = Mathf.Sign(forceY) * 450;
+
+            rb.AddForce(new Vector2(forceX, forceY));
+        }
     }
 }
